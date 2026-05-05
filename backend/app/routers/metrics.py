@@ -7,12 +7,12 @@ router = APIRouter()
 
 
 @router.get("/usage", response_model=UsageSummary)
-def usage_metrics() -> UsageSummary:
+async def usage_metrics() -> UsageSummary:
     """Aggregate token and request counts across all models."""
-    return get_usage_summary()
+    return await get_usage_summary()
 
 
 @router.get("/latency", response_model=LatencySummary)
-def latency_metrics() -> LatencySummary:
+async def latency_metrics() -> LatencySummary:
     """P50/P95/P99 latency per model."""
-    return get_latency_summary()
+    return await get_latency_summary()

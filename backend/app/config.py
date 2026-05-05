@@ -54,5 +54,14 @@ class Settings(BaseSettings):
     # --- Polling / refresh ---
     metrics_refresh_seconds: int = 30
 
+    # --- Prometheus (metrics adapter) ---
+    # Leave empty to fall back to stub data.
+    prometheus_url: str = ""
+
+    # --- OpenAI (cost adapter) ---
+    # When set, cost data is sourced from the OpenAI usage API.
+    openai_api_key: str = ""
+    openai_org_id: str = ""
+
 
 settings = Settings()

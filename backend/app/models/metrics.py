@@ -25,7 +25,9 @@ class UsageSummary(BaseModel):
     total_tokens: int
     error_rate: float
     models: list[UsageMetric]
+    data_source: str = "stub"
 
 
 class LatencySummary(BaseModel):
     models: list[LatencyMetric]
+    data_source: str = "stub"

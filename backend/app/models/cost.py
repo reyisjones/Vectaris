@@ -16,6 +16,7 @@ class CostSummary(BaseModel):
     period: str
     by_model: list[CostRecord]
     by_team: list[CostRecord]
+    data_source: str = "stub"
 
 
 class CostForecast(BaseModel):
@@ -23,3 +24,4 @@ class CostForecast(BaseModel):
     projected_usd: float
     daily_run_rate_usd: float
     generated_at: datetime
+    data_source: str = "stub"

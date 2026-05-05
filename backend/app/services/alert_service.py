@@ -7,6 +7,7 @@ fresh signals without a background scheduler.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 from app.models.alert import Alert, AlertSeverity
@@ -31,8 +32,8 @@ ERROR_RATE_THRESHOLD = 0.02
 AGENT_SUCCESS_RATE_FLOOR = 0.90
 
 
-def _evaluate_latency_alerts() -> list[Alert]:
-    summary = get_latency_summary()
+async def _evaluate_latency_alerts() -> list[Alert]:
+    summary = await get_latency_summary()
     now = datetime.now(tz=timezone.utc)
     alerts: list[Alert] = []
     for metric in summary.models:
@@ -53,8 +54,8 @@ def _evaluate_latency_alerts() -> list[Alert]:
     return alerts
 
 
-def _evaluate_error_rate_alerts() -> list[Alert]:
-    summary = get_usage_summary()
+async def _evaluate_error_rate_alerts() -> list[Alert]:
+    summary = await get_usage_summary()
     now = datetime.now(tz=timezone.utc)
     if summary.error_rate <= ERROR_RATE_THRESHOLD:
         return []
@@ -95,10 +96,14 @@ def _evaluate_agent_alerts() -> list[Alert]:
     return alerts
 
 
-def evaluate_alerts() -> list[Alert]:
+async def evaluate_alerts() -> list[Alert]:
+    latency_alerts, error_alerts = await asyncio.gather(
+        _evaluate_latency_alerts(),
+        _evaluate_error_rate_alerts(),
+    )
     return [
         *_SEED_ALERTS,
-        *_evaluate_latency_alerts(),
-        *_evaluate_error_rate_alerts(),
+        *latency_alerts,
+        *error_alerts,
         *_evaluate_agent_alerts(),
     ]
