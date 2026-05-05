@@ -5,10 +5,10 @@ Items marked `[x]` were completed in the most recent iteration; `[ ]` items are 
 
 ## Backend
 
-- [ ] **P0** Replace stub `metrics_service`, `cost_service`, `agent_service` with real data sources (Azure Monitor / PromQL / cost APIs)
-- [ ] **P0** Persist agent registry (Postgres / Cosmos DB) and add `POST /agents` for registration
+- [x] **P0** Replace stub `metrics_service`, `cost_service`, `agent_service` with real data sources (Azure Monitor / PromQL / cost APIs) — _Prometheus adapter (PromQL) + OpenAI billing adapter shipped; stub fallback when unconfigured; `data_source` field in all responses_
+- [x] **P0** Persist agent registry (Postgres / Cosmos DB) and add `POST /agents` for registration — _in-memory dict registry with `POST /agents`, `DELETE /agents/{id}`, `PATCH /agents/{id}/heartbeat`_
 - [x] **P0** Add API authentication (API key middleware via `X-API-Key`, opt-in through `API_KEY` env var) — _shipped in `app/auth.py`_
-- [ ] **P0** Replace static API key with OIDC / Azure Managed Identity
+- [x] **P0** Replace static API key with OIDC / Azure Managed Identity — _`app/oidc.py` with PyJWKClient; OIDC > API key > open mode selection; supports Azure Entra ID, Okta, Auth0_
 - [ ] **P1** Configurable alert rules via YAML or `/alerts` admin endpoint
 - [ ] **P1** Background scheduler (APScheduler) for periodic alert evaluation + webhook delivery
 - [ ] **P1** `/api/v1/llm/chat` proxy with token + latency capture for any OpenAI-compatible runtime
@@ -32,8 +32,8 @@ Items marked `[x]` were completed in the most recent iteration; `[ ]` items are 
 
 ## Telemetry & Ops
 
-- [ ] **P0** Wire OTel context into `httpx` client used by `llm_runtime_service`
-- [ ] **P0** Add Grafana dashboard JSON in `deploy/grafana/`
+- [x] **P0** Wire OTel context into `httpx` client used by `llm_runtime_service` — _`propagate.inject` injects trace context into request headers; also fixed malformed function body in `llm_runtime_service.py`_
+- [x] **P0** Add Grafana dashboard JSON in `deploy/grafana/` — _`vectaris-dashboard.json` with 5 stat KPI panels, LLM latency p50/p95/p99, agent health table, cost tracking, API rate/latency; provisioning YAML included_
 - [ ] **P1** Prometheus ServiceMonitor CRD in `deploy/kubernetes/`
 - [ ] **P1** Frontend Web Vitals → OTel Browser SDK → backend ingest
 - [ ] **P2** Distributed tracing demo with OpenAI mock + Ollama
