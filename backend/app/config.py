@@ -28,9 +28,16 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = 10.0
 
     # --- Auth ---
-    # When non-empty, requests to /api/v1/** must carry X-API-Key with this value.
+    # Static API key mode: when non-empty, requests must carry X-API-Key with this value.
     api_key: str = ""
     api_key_header: str = "X-API-Key"
+
+    # OIDC mode: when oidc_issuer is set, Bearer JWT validation replaces the static key.
+    # Set oidc_jwks_uri to skip discovery (faster startup); leave empty to auto-discover.
+    # Azure AD example: https://login.microsoftonline.com/{tenant}/v2.0
+    oidc_issuer: str = ""
+    oidc_audience: str = ""
+    oidc_jwks_uri: str = ""
 
     # --- OpenTelemetry ---
     otel_enabled: bool = False

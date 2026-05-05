@@ -1,7 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from __future__ import annotations
 
-from app.models.agent import Agent, AgentHealth
-from app.services.agent_service import get_agent_health, list_agents
+from fastapi import APIRouter, HTTPException, status
+
+from app.models.agent import Agent, AgentHealth, AgentHeartbeat, AgentRegistration
+from app.services.agent_service import (
+    deregister_agent,
+    get_agent_health,
+    heartbeat_agent,
+    list_agents,
+    register_agent,
+)
 
 router = APIRouter()
 
@@ -12,9 +20,36 @@ def get_agents() -> list[Agent]:
     return list_agents()
 
 
+@router.post("", response_model=Agent, status_code=status.HTTP_201_CREATED)
+def create_agent(registration: AgentRegistration) -> Agent:
+    """Register a new agent (or idempotently re-register an existing one).
+
+    On success the full ``Agent`` record is returned including the assigned
+    ``id``.  Agents should subsequently call the heartbeat endpoint to keep
+    their ``last_seen`` timestamp fresh.
+    """
+    return register_agent(registration)
+
+
+@router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_agent(agent_id: str) -> None:
+    """Deregister an agent by ID."""
+    if not deregister_agent(agent_id):
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
+
+
+@router.patch("/{agent_id}/heartbeat", response_model=Agent)
+def agent_heartbeat(agent_id: str, beat: AgentHeartbeat) -> Agent:
+    """Accept a heartbeat from a running agent to refresh its stats."""
+    agent = heartbeat_agent(agent_id, beat)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
+    return agent
+
+
 @router.get("/{agent_id}/health", response_model=AgentHealth)
 def agent_health(agent_id: str) -> AgentHealth:
-    """Run a health check for a specific agent."""
+    """Return a health snapshot for a specific agent."""
     health = get_agent_health(agent_id)
     if not health:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")

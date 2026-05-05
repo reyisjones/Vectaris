@@ -129,3 +129,53 @@ def test_api_key_enforced_when_configured(monkeypatch):
     ok = client.get("/api/v1/agents", headers={"X-API-Key": "secret-token"})
     assert ok.status_code == 200
 
+
+# ---------------------------------------------------------------------------
+# Agent registry (POST /agents, DELETE, heartbeat)
+# ---------------------------------------------------------------------------
+
+
+def test_register_agent_returns_201():
+    payload = {"name": "test-agent", "model": "gpt-4o", "tags": {"env": "ci"}}
+    response = client.post("/api/v1/agents", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "test-agent"
+    assert body["model"] == "gpt-4o"
+    assert body["tags"] == {"env": "ci"}
+    assert "id" in body
+    assert "registered_at" in body
+    # Clean up
+    client.delete(f"/api/v1/agents/{body['id']}")
+
+
+def test_register_agent_with_explicit_id_is_idempotent():
+    payload = {"name": "stable-agent", "model": "gpt-4o-mini", "agent_id": "my-pod-1"}
+    r1 = client.post("/api/v1/agents", json=payload)
+    assert r1.status_code == 201
+    r2 = client.post("/api/v1/agents", json=payload)
+    assert r2.status_code == 201
+    assert r1.json()["registered_at"] == r2.json()["registered_at"]
+    # Clean up
+    client.delete("/api/v1/agents/my-pod-1")
+
+
+def test_delete_agent():
+    payload = {"name": "ephemeral-agent", "model": "gpt-4o"}
+    agent_id = client.post("/api/v1/agents", json=payload).json()["id"]
+    assert client.delete(f"/api/v1/agents/{agent_id}").status_code == 204
+    assert client.delete(f"/api/v1/agents/{agent_id}").status_code == 404
+
+
+def test_agent_heartbeat():
+    payload = {"name": "heartbeat-agent", "model": "gpt-4o"}
+    agent_id = client.post("/api/v1/agents", json=payload).json()["id"]
+    beat = {"status": "degraded", "task_success_rate": 0.75, "uptime_seconds": 120}
+    resp = client.patch(f"/api/v1/agents/{agent_id}/heartbeat", json=beat)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "degraded"
+    assert body["task_success_rate"] == 0.75
+    # Clean up
+    client.delete(f"/api/v1/agents/{agent_id}")
+
