@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.auth import APIKeyMiddleware
 from app.config import settings
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware
@@ -44,7 +45,7 @@ def create_app() -> FastAPI:
         version=settings.api_version,
         lifespan=lifespan,
     )
-
+    app.add_middleware(APIKeyMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,

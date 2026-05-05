@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     )
     request_timeout_seconds: float = 10.0
 
+    # --- Auth ---
+    # When non-empty, requests to /api/v1/** must carry X-API-Key with this value.
+    api_key: str = ""
+    api_key_header: str = "X-API-Key"
+
     # --- OpenTelemetry ---
     otel_enabled: bool = False
     otel_service_name: str = "ai-platform-dashboard"

@@ -104,3 +104,28 @@ async def test_llm_runtime_disabled_by_default():
     assert body["status"]["provider"] == "ollama"
     assert body["status"]["reachable"] is False
 
+
+def test_api_key_disabled_by_default_allows_protected_path():
+    # No API_KEY configured → /api/v1/** is public.
+    response = client.get("/api/v1/agents")
+    assert response.status_code == 200
+
+
+def test_api_key_enforced_when_configured(monkeypatch):
+    from app import auth as auth_module
+
+    monkeypatch.setattr(auth_module.settings, "api_key", "secret-token")
+
+    # Public paths still work without a key.
+    assert client.get("/health").status_code == 200
+    assert client.get("/metrics").status_code == 200
+
+    # Protected path without a key is rejected.
+    bad = client.get("/api/v1/agents")
+    assert bad.status_code == 401
+    assert bad.json()["detail"] == "Invalid or missing API key"
+
+    # Protected path with the correct key succeeds.
+    ok = client.get("/api/v1/agents", headers={"X-API-Key": "secret-token"})
+    assert ok.status_code == 200
+
