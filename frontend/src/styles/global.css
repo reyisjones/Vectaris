@@ -241,6 +241,23 @@ table tbody td {
   font-size: 13px;
 }
 
+.btn {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 13px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.btn:hover {
+  background: var(--bg-card);
+  border-color: var(--accent);
+}
+
 @media (max-width: 880px) {
   .app-shell {
     grid-template-columns: 1fr;

@@ -9,6 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { CostRecord } from "../services/api";
+import { axisStroke, gridStroke, tooltipStyle } from "./chartTheme";
 
 interface Props {
   title: string;
@@ -21,19 +22,14 @@ export const CostBreakdown: React.FC<Props> = ({ title, records, dimension }) =>
     <p className="card-title">{title}</p>
     <ResponsiveContainer width="100%" height={240}>
       <BarChart data={records}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-        <XAxis dataKey={dimension} stroke="#64748b" tick={{ fontSize: 11 }} />
-        <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridStroke()} />
+        <XAxis dataKey={dimension} stroke={axisStroke()} tick={{ fontSize: 11 }} />
+        <YAxis stroke={axisStroke()} tick={{ fontSize: 11 }} />
         <Tooltip
-          contentStyle={{
-            background: "#0f172a",
-            border: "1px solid #334155",
-            borderRadius: 6,
-            fontSize: 12,
-          }}
+          contentStyle={tooltipStyle()}
           formatter={(v: number) => `$${v.toFixed(2)}`}
         />
-        <Bar dataKey="usd_cost" fill="#818cf8" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="usd_cost" fill="var(--accent-2)" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   </div>
