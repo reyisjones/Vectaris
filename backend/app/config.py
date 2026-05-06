@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     ollama_enabled: bool = False
     ollama_base_url: str = "http://localhost:11434"
 
+    # --- LLM chat proxy ---
+    # Set to an OpenAI-compatible base URL (no trailing slash).
+    # Defaults to the Ollama endpoint; override for OpenAI, Azure OpenAI, etc.
+    llm_chat_url: str = ""
+    llm_chat_api_key: str = ""
+
     # --- Polling / refresh ---
     metrics_refresh_seconds: int = 30
 
@@ -62,6 +68,25 @@ class Settings(BaseSettings):
     # When set, cost data is sourced from the OpenAI usage API.
     openai_api_key: str = ""
     openai_org_id: str = ""
+
+    # --- Azure Cost Management adapter ---
+    azure_subscription_id: str = ""
+    azure_tenant_id: str = ""
+    azure_client_id: str = ""
+    azure_client_secret: str = ""
+    azure_cm_scope: str = ""  # override default /subscriptions/{sub_id}
+
+    # --- AWS Cost Explorer adapter ---
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_session_token: str = ""
+    aws_region: str = "us-east-1"
+
+    # --- Alert scheduler ---
+    alert_eval_interval_seconds: int = 60
+    alert_webhook_url: str = ""
+    alert_webhook_secret: str = ""
+    alert_webhook_timeout_seconds: float = 5.0
 
 
 settings = Settings()

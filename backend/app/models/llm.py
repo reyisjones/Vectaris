@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,3 +26,47 @@ class LLMModelInfo(BaseModel):
 class LLMRuntimeReport(BaseModel):
     status: LLMRuntimeStatus
     models: list[LLMModelInfo]
+
+
+# ---------------------------------------------------------------------------
+# Chat proxy models (OpenAI-compatible)
+# ---------------------------------------------------------------------------
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(system|user|assistant|tool)$")
+    content: str
+    name: Optional[str] = None
+
+
+class ChatRequest(BaseModel):
+    model: str
+    messages: list[ChatMessage]
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(default=None, ge=1)
+    stream: bool = False
+    # Pass-through extras forwarded unchanged to the upstream provider.
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatUsage(BaseModel):
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+class ChatChoice(BaseModel):
+    index: int
+    message: ChatMessage
+    finish_reason: Optional[str] = None
+
+
+class ChatResponse(BaseModel):
+    id: str
+    object: str = "chat.completion"
+    model: str
+    choices: list[ChatChoice]
+    usage: ChatUsage
+    # Vectaris instrumentation fields
+    latency_ms: float
+    upstream_url: str

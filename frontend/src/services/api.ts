@@ -2,10 +2,26 @@ import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
+// API key is read from localStorage and injected per-request.
+function getStoredApiKey(): string {
+  return typeof window !== "undefined"
+    ? (localStorage.getItem("vectaris_api_key") ?? "")
+    : "";
+}
+
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10_000,
   headers: { "Content-Type": "application/json" },
+});
+
+// Inject X-API-Key header before every request when a key is stored.
+api.interceptors.request.use((config) => {
+  const key = getStoredApiKey();
+  if (key) {
+    config.headers["X-API-Key"] = key;
+  }
+  return config;
 });
 
 // --- Types ---
@@ -142,3 +158,76 @@ export const getAlerts = () =>
 
 export const getLLMRuntime = () =>
   api.get<LLMRuntimeReport>("/api/v1/llm/runtime").then((r) => r.data);
+
+// --- Alert rules ---
+export type AlertMetric =
+  | "latency_p99_ms"
+  | "latency_p95_ms"
+  | "latency_p50_ms"
+  | "error_rate"
+  | "agent_task_success_rate"
+  | "cost_budget_pct";
+
+export type AlertOperator = ">" | ">=" | "<" | "<=" | "==";
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  metric: AlertMetric;
+  operator: AlertOperator;
+  threshold: number;
+  severity: AlertSeverity;
+  source: string;
+  enabled: boolean;
+}
+
+export interface AlertRuleCreate
+  extends Omit<AlertRule, "id"> {}
+
+export const getAlertRules = () =>
+  api.get<AlertRule[]>("/api/v1/alerts/rules").then((r) => r.data);
+
+export const upsertAlertRule = (id: string, payload: AlertRuleCreate) =>
+  api.put<AlertRule>(`/api/v1/alerts/rules/${id}`, payload).then((r) => r.data);
+
+export const deleteAlertRule = (id: string) =>
+  api.delete(`/api/v1/alerts/rules/${id}`);
+
+// --- LLM chat proxy ---
+export interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  name?: string;
+}
+
+export interface ChatRequest {
+  model: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+}
+
+export interface ChatUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+export interface ChatChoice {
+  index: number;
+  message: ChatMessage;
+  finish_reason: string | null;
+}
+
+export interface ChatResponse {
+  id: string;
+  object: string;
+  model: string;
+  choices: ChatChoice[];
+  usage: ChatUsage;
+  latency_ms: number;
+  upstream_url: string;
+}
+
+export const chatCompletion = (request: ChatRequest) =>
+  api.post<ChatResponse>("/api/v1/llm/chat", request).then((r) => r.data);

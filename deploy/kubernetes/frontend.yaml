@@ -1,0 +1,124 @@
+# Vectaris – Frontend Kubernetes manifests
+# Deployment + Service (ClusterIP) + Ingress
+#
+# Apply with:
+#   kubectl apply -f deploy/kubernetes/frontend.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vectaris-frontend
+  namespace: ai-platform
+  labels:
+    app: vectaris-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vectaris-frontend
+  template:
+    metadata:
+      labels:
+        app: vectaris-frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101       # nginx default non-root user
+      containers:
+        - name: frontend
+          image: vectaris-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            - name: VITE_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: vectaris-frontend-config
+                  key: api_url
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false   # nginx needs to write tmp files
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vectaris-frontend-config
+  namespace: ai-platform
+data:
+  # Override this with the actual backend Service DNS name or external URL.
+  api_url: "http://vectaris-backend.ai-platform.svc.cluster.local:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vectaris-frontend
+  namespace: ai-platform
+  labels:
+    app: vectaris-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: vectaris-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vectaris
+  namespace: ai-platform
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # Uncomment to enable TLS via cert-manager:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  # tls:
+  #   - hosts:
+  #       - vectaris.example.com
+  #     secretName: vectaris-tls
+  rules:
+    - host: vectaris.example.com  # Replace with your actual hostname
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-platform-backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vectaris-frontend
+                port:
+                  number: 80

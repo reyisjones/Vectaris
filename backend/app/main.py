@@ -17,6 +17,7 @@ from app.config import settings
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.routers import agents, alerts, costs, health, llm, metrics
+from app.scheduler import start_scheduler, stop_scheduler
 from app.telemetry.setup import configure_telemetry, instrument_app
 
 
@@ -32,7 +33,9 @@ async def lifespan(app: FastAPI):
         otel_enabled=settings.otel_enabled,
         ollama_enabled=settings.ollama_enabled,
     )
+    start_scheduler()
     yield
+    stop_scheduler()
     structlog.get_logger("app").info("app.shutdown")
 
 
@@ -51,7 +54,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],
     )

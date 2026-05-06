@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import React from "react";
+import React, { useState } from "react";
 import { AgentHealthTable } from "../components/AgentHealthTable";
 import { AlertsList } from "../components/AlertsList";
 import { LatencyChart } from "../components/LatencyChart";
 import { ErrorCard, LoadingCard } from "../components/LoadingState";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
+import { TimeRangeSelector, TimePeriod } from "../components/TimeRangeSelector";
 import {
   getAgents,
   getAlerts,
@@ -17,6 +18,8 @@ import {
 const REFRESH_MS = 30_000;
 
 export const DashboardPage: React.FC = () => {
+  const [period, setPeriod] = useState<TimePeriod>("30d");
+
   const usage = useQuery({
     queryKey: ["usage"],
     queryFn: getUsageMetrics,
@@ -33,8 +36,8 @@ export const DashboardPage: React.FC = () => {
     refetchInterval: REFRESH_MS,
   });
   const costs = useQuery({
-    queryKey: ["costs", "30d"],
-    queryFn: () => getCosts("30d"),
+    queryKey: ["costs", period],
+    queryFn: () => getCosts(period),
   });
   const alerts = useQuery({
     queryKey: ["alerts"],
@@ -50,6 +53,7 @@ export const DashboardPage: React.FC = () => {
       <PageHeader
         title="Overview"
         subtitle={`Live AI platform telemetry · refreshing every ${REFRESH_MS / 1000}s`}
+        actions={<TimeRangeSelector value={period} onChange={setPeriod} />}
       />
       {errored && <ErrorCard message="One or more telemetry sources failed to load." />}
 
@@ -57,14 +61,14 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           title="Total Requests"
           value={(usage.data?.total_requests ?? 0).toLocaleString()}
-          subtitle="last 30d"
+          subtitle={`last ${period}`}
           trend="up"
           trendValue="+12% vs prior period"
         />
         <MetricCard
           title="Total Tokens"
           value={(usage.data?.total_tokens ?? 0).toLocaleString()}
-          subtitle="last 30d"
+          subtitle={`last ${period}`}
         />
         <MetricCard
           title="Error Rate"

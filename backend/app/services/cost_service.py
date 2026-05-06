@@ -1,13 +1,13 @@
-"""Cost service — queries OpenAI billing when configured, falls back to stubs.
+"""Cost service — queries cost adapters in priority order, falls back to stubs.
 
 Data source priority
 --------------------
-1. **OpenAI billing API** — when ``OPENAI_API_KEY`` is set.  Usage is fetched
-   from ``/v1/usage`` and costs are estimated from a built-in price table in
-   ``app/adapters/openai_billing.py``.  ``team`` labels are not available from
-   OpenAI directly and default to ``"openai"``.
-2. **Stub** — deterministic demo data for dev / CI.  The ``data_source`` field
-   in the response indicates which backend answered (``"openai"`` vs ``"stub"``).
+1. **Azure Cost Management** — when ``AZURE_SUBSCRIPTION_ID`` + credentials set.
+2. **AWS Cost Explorer**     — when ``AWS_ACCESS_KEY_ID`` + secret set.
+3. **OpenAI billing API**    — when ``OPENAI_API_KEY`` is set.
+4. **Stub**                  — deterministic demo data for dev / CI.
+
+The ``data_source`` field in the response indicates which backend answered.
 """
 
 from __future__ import annotations
@@ -15,7 +15,9 @@ from __future__ import annotations
 import structlog
 from datetime import datetime, timezone
 
-from app.adapters.openai_billing import get_usage_costs
+from app.adapters.aws_cost import get_usage_costs as aws_get_costs
+from app.adapters.azure_cost import get_usage_costs as azure_get_costs
+from app.adapters.openai_billing import get_usage_costs as openai_get_costs
 from app.models.cost import CostForecast, CostRecord, CostSummary
 
 _log = structlog.get_logger("cost_service")
@@ -58,15 +60,29 @@ def _period_to_days(period: str) -> int:
     return value if unit == "d" else value * 7
 
 
+async def _try_adapters(period_days: int) -> tuple[list[dict] | None, str]:
+    """Try each adapter in priority order, returning (rows, source_name)."""
+    rows = await azure_get_costs(period_days=period_days)
+    if rows is not None:
+        return rows, "azure"
+    rows = await aws_get_costs(period_days=period_days)
+    if rows is not None:
+        return rows, "aws"
+    rows = await openai_get_costs(period_days=period_days)
+    if rows is not None:
+        return rows, "openai"
+    return None, "stub"
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 
 async def get_cost_summary(period: str = "30d") -> CostSummary:
-    """Return cost breakdown by model and team.  Tries OpenAI billing first."""
+    """Return cost breakdown by model and team.  Tries adapters in priority order."""
     period_days = _period_to_days(period) or 30
-    rows = await get_usage_costs(period_days=period_days)
+    rows, source = await _try_adapters(period_days)
 
     if rows is None:
         _log.debug("cost.fallback_to_stub")
@@ -82,20 +98,20 @@ async def get_cost_summary(period: str = "30d") -> CostSummary:
     records = [
         CostRecord(
             model=r["model"],
-            team="openai",  # team granularity not available from OpenAI billing API
+            team=r.get("team", source),
             usd_cost=r["usd_cost"],
-            token_count=r["token_count"],
-            request_count=r["request_count"],
+            token_count=r.get("token_count", 0),
+            request_count=r.get("request_count", 0),
         )
         for r in rows
     ]
-    _log.info("cost.from_openai", models=len(records))
+    _log.info("cost.from_adapter", source=source, models=len(records))
     return CostSummary(
         total_usd=round(sum(r.usd_cost for r in records), 2),
         period=period,
         by_model=records,
         by_team=_aggregate_by_team(records),
-        data_source="openai",
+        data_source=source,
     )
 
 

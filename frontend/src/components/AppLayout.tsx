@@ -7,6 +7,7 @@ const links = [
   { to: "/costs", label: "Costs" },
   { to: "/alerts", label: "Alerts" },
   { to: "/llm", label: "LLM Runtime" },
+  { to: "/settings", label: "Settings" },
 ];
 
 export const AppLayout: React.FC = () => (

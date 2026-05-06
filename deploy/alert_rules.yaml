@@ -1,0 +1,40 @@
+# Vectaris alert rules — loaded at startup, overridable via API
+# Each rule maps a metric condition to an alert severity.
+# Changes made via POST /api/v1/alerts/rules take precedence over this file.
+
+rules:
+  - id: latency-p99
+    name: High P99 latency
+    metric: latency_p99_ms
+    operator: ">"
+    threshold: 1000.0
+    severity: high
+    source: latency-monitor
+    enabled: true
+
+  - id: error-rate
+    name: Elevated error rate
+    metric: error_rate
+    operator: ">"
+    threshold: 0.02
+    severity: critical
+    source: usage-monitor
+    enabled: true
+
+  - id: agent-success-rate
+    name: Agent degraded success rate
+    metric: agent_task_success_rate
+    operator: "<"
+    threshold: 0.90
+    severity: medium
+    source: agent-monitor
+    enabled: true
+
+  - id: cost-budget-80pct
+    name: Cost budget threshold (80%)
+    metric: cost_budget_pct
+    operator: ">"
+    threshold: 80.0
+    severity: medium
+    source: cost-monitor
+    enabled: true

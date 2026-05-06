@@ -1,0 +1,33 @@
+# Prometheus Operator ServiceMonitor for the Vectaris backend.
+#
+# Prerequisites:
+#   • kube-prometheus-stack (or standalone prometheus-operator) installed
+#   • The namespace label below must match your Prometheus selector
+#     (typically `release: prometheus` for kube-prometheus-stack).
+#
+# Apply with:
+#   kubectl apply -f deploy/kubernetes/servicemonitor.yaml
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vectaris-backend
+  namespace: ai-platform
+  labels:
+    app: vectaris-backend
+    # Must match the serviceMonitorSelector in your Prometheus resource.
+    # For kube-prometheus-stack this is typically: release: prometheus
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ai-platform-backend
+  namespaceSelector:
+    matchNames:
+      - ai-platform
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
