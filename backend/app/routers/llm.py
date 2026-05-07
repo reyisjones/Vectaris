@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from opentelemetry import trace
 from opentelemetry.propagate import inject
 
@@ -17,6 +17,7 @@ from app.models.llm import (
     ChatResponse,
     LLMRuntimeReport,
 )
+from app.ratelimit import check_tenant_quota, limiter
 from app.services.llm_runtime_service import get_runtime_report
 
 router = APIRouter()
@@ -30,7 +31,8 @@ async def llm_runtime() -> LLMRuntimeReport:
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def llm_chat(request: ChatRequest) -> ChatResponse:
+@limiter.limit("20/minute")  # Stricter limit for cost-intensive LLM calls
+async def llm_chat(request_obj: Request, request: ChatRequest) -> ChatResponse:
     """Proxy a chat completion request to any OpenAI-compatible upstream.
 
     The upstream URL is resolved in priority order:
@@ -40,7 +42,13 @@ async def llm_chat(request: ChatRequest) -> ChatResponse:
 
     Token counts and end-to-end latency are captured and returned alongside
     the upstream response.
+    
+    Rate limits:
+    - 20 requests/minute per tenant/user/IP
+    - Monthly quota of 100k requests per tenant (when authenticated)
     """
+    # Enforce monthly tenant quota
+    check_tenant_quota(request_obj)
     base_url = _resolve_upstream_url()
     upstream = f"{base_url}/v1/chat/completions"
 
@@ -120,3 +128,22 @@ def _resolve_upstream_url() -> str:
     if settings.ollama_enabled:
         return settings.ollama_base_url.rstrip("/")
     return "https://api.openai.com"
+
+
+@router.get("/quota")
+async def get_quota_stats(request: Request) -> dict[str, Any]:
+    """
+    Return the current tenant's monthly quota usage.
+    
+    Returns 404 if no tenant is authenticated.
+    """
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(
+            status_code=404,
+            detail="No tenant identified. Quota tracking requires authentication with tenant_id claim.",
+        )
+    
+    from app.ratelimit import get_tenant_quota_stats
+    
+    return get_tenant_quota_stats(tenant_id)

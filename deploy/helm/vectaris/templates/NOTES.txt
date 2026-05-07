@@ -1,0 +1,37 @@
+✅ Vectaris has been successfully installed!
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+
+🌐 Access Vectaris at:
+   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+
+{{- end }}
+{{- else }}
+
+To access the frontend, run:
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "vectaris.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=frontend" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:80
+
+Then visit http://localhost:8080 in your browser.
+
+To access the backend API:
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "vectaris.name" . }},app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=backend" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8000:8000
+
+Backend API available at http://localhost:8000
+
+{{- end }}
+
+📊 Check deployment status:
+  kubectl --namespace {{ .Release.Namespace }} get pods -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+📝 View logs:
+  kubectl --namespace {{ .Release.Namespace }} logs -l "app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=backend" --tail=100 -f
+
+{{- if .Values.serviceMonitor.enabled }}
+
+📈 Prometheus ServiceMonitor enabled — metrics available at /metrics endpoint
+{{- end }}
+
+For more information, visit: https://github.com/reyisjones/Vectaris

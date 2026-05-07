@@ -1,0 +1,19 @@
+apiVersion: v2
+name: vectaris
+description: AI Platform Observability Dashboard - Real-time monitoring for AI agents, LLM usage, costs, and performance
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - observability
+  - monitoring
+  - llm
+  - agents
+  - telemetry
+home: https://github.com/reyisjones/Vectaris
+sources:
+  - https://github.com/reyisjones/Vectaris
+maintainers:
+  - name: Vectaris Team
+    email: maintainers@vectaris.dev

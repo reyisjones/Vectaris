@@ -88,5 +88,11 @@ class Settings(BaseSettings):
     alert_webhook_secret: str = ""
     alert_webhook_timeout_seconds: float = 5.0
 
+    # --- Rate limiting ---
+    # Redis URL for distributed rate limit storage (optional).
+    # Falls back to in-memory storage when empty.
+    # Format: redis://[:password@]host[:port][/db]
+    redis_url: str = ""
+
 
 settings = Settings()

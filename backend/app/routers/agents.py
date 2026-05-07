@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.models.agent import Agent, AgentHealth, AgentHeartbeat, AgentRegistration
+from app.ratelimit import limiter
 from app.services.agent_service import (
     deregister_agent,
     get_agent_health,
@@ -21,7 +22,8 @@ def get_agents() -> list[Agent]:
 
 
 @router.post("", response_model=Agent, status_code=status.HTTP_201_CREATED)
-def create_agent(registration: AgentRegistration) -> Agent:
+@limiter.limit("10/minute")  # Prevent agent registration spam
+def create_agent(request: Request, registration: AgentRegistration) -> Agent:
     """Register a new agent (or idempotently re-register an existing one).
 
     On success the full ``Agent`` record is returned including the assigned

@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
 
 const links = [
   { to: "/", label: "Dashboard", end: true },
@@ -23,7 +24,10 @@ export const AppLayout: React.FC = () => (
           </NavLink>
         ))}
       </nav>
-      <div className="footer">v1.0.0 · AI Platform Observability</div>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <ThemeToggle />
+        <div className="footer">v1.0.0 · AI Platform Observability</div>
+      </div>
     </aside>
     <main className="content">
       <Outlet />

@@ -11,11 +11,14 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.auth import APIKeyMiddleware
 from app.config import settings
 from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware
+from app.ratelimit import limiter
 from app.routers import agents, alerts, costs, health, llm, metrics
 from app.scheduler import start_scheduler, stop_scheduler
 from app.telemetry.setup import configure_telemetry, instrument_app
@@ -48,6 +51,11 @@ def create_app() -> FastAPI:
         version=settings.api_version,
         lifespan=lifespan,
     )
+    
+    # Rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    
     app.add_middleware(APIKeyMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
