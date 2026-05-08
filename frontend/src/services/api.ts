@@ -231,3 +231,41 @@ export interface ChatResponse {
 
 export const chatCompletion = (request: ChatRequest) =>
   api.post<ChatResponse>("/api/v1/llm/chat", request).then((r) => r.data);
+
+// --- SSE live metrics stream ---
+
+export interface MetricsStreamEvent {
+  usage: UsageSummary;
+  latency: LatencySummary;
+}
+
+/**
+ * Opens an SSE connection to /api/v1/metrics/stream.
+ * Returns a cleanup function that closes the EventSource.
+ *
+ * @param onData  called each time a metrics event arrives
+ * @param onError called on connection error (optional)
+ * @param intervalSeconds push interval hint for the server (default 5)
+ */
+export function subscribeMetricsStream(
+  onData: (event: MetricsStreamEvent) => void,
+  onError?: (err: Event) => void,
+  intervalSeconds = 5,
+): () => void {
+  const url = `${BASE_URL}/api/v1/metrics/stream?interval=${intervalSeconds}`;
+  const source = new EventSource(url);
+
+  source.onmessage = (e) => {
+    try {
+      onData(JSON.parse(e.data) as MetricsStreamEvent);
+    } catch {
+      // malformed frame — ignore
+    }
+  };
+
+  if (onError) {
+    source.onerror = onError;
+  }
+
+  return () => source.close();
+}

@@ -20,6 +20,7 @@ from app.logging_config import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.ratelimit import limiter
 from app.routers import agents, alerts, costs, health, llm, metrics
+from app.graphql_schema import graphql_router
 from app.scheduler import start_scheduler, stop_scheduler
 from app.telemetry.setup import configure_telemetry, instrument_app
 
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(costs.router, prefix="/api/v1/costs", tags=["costs"])
     app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
     app.include_router(llm.router, prefix="/api/v1/llm", tags=["llm"])
+    app.include_router(graphql_router, prefix="/graphql", tags=["graphql"])
 
     return app
 

@@ -7,29 +7,55 @@ import { ErrorCard, LoadingCard } from "../components/LoadingState";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { TimeRangeSelector, TimePeriod } from "../components/TimeRangeSelector";
+import { useMetricsStream } from "../hooks/useMetricsStream";
 import {
   getAgents,
   getAlerts,
   getCosts,
-  getLatencyMetrics,
-  getUsageMetrics,
 } from "../services/api";
 
 const REFRESH_MS = 30_000;
 
+/** Small indicator dot showing SSE connection status */
+const StreamBadge: React.FC<{ connected: boolean; lastUpdated: string | null }> = ({
+  connected,
+  lastUpdated,
+}) => (
+  <span
+    title={
+      connected
+        ? `Live · last update ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : "—"}`
+        : "Connecting…"
+    }
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "0.35rem",
+      fontSize: "0.75rem",
+      color: connected ? "var(--success, #22c55e)" : "var(--text-muted)",
+    }}
+  >
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: connected ? "var(--success, #22c55e)" : "var(--text-muted)",
+        boxShadow: connected ? "0 0 0 3px rgba(34,197,94,0.25)" : "none",
+        display: "inline-block",
+        animation: connected ? "pulse 2s infinite" : "none",
+      }}
+    />
+    {connected ? "Live" : "Connecting…"}
+  </span>
+);
+
 export const DashboardPage: React.FC = () => {
   const [period, setPeriod] = useState<TimePeriod>("30d");
 
-  const usage = useQuery({
-    queryKey: ["usage"],
-    queryFn: getUsageMetrics,
-    refetchInterval: REFRESH_MS,
-  });
-  const latency = useQuery({
-    queryKey: ["latency"],
-    queryFn: getLatencyMetrics,
-    refetchInterval: REFRESH_MS,
-  });
+  // Real-time metrics via SSE (replaces polling for usage + latency)
+  const stream = useMetricsStream(5);
+
   const agents = useQuery({
     queryKey: ["agents"],
     queryFn: getAgents,
@@ -45,35 +71,42 @@ export const DashboardPage: React.FC = () => {
     refetchInterval: 15_000,
   });
 
-  const errored =
-    usage.isError || latency.isError || agents.isError || costs.isError || alerts.isError;
+  const errored = agents.isError || costs.isError || alerts.isError;
 
   return (
     <>
       <PageHeader
         title="Overview"
-        subtitle={`Live AI platform telemetry · refreshing every ${REFRESH_MS / 1000}s`}
-        actions={<TimeRangeSelector value={period} onChange={setPeriod} />}
+        subtitle="Live AI platform telemetry"
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <StreamBadge connected={stream.connected} lastUpdated={stream.lastUpdated} />
+            <TimeRangeSelector value={period} onChange={setPeriod} />
+          </div>
+        }
       />
       {errored && <ErrorCard message="One or more telemetry sources failed to load." />}
+      {stream.error && (
+        <ErrorCard message={stream.error} />
+      )}
 
       <div className="grid grid-kpi" style={{ marginBottom: "1.25rem" }}>
         <MetricCard
           title="Total Requests"
-          value={(usage.data?.total_requests ?? 0).toLocaleString()}
+          value={(stream.usage?.total_requests ?? 0).toLocaleString()}
           subtitle={`last ${period}`}
           trend="up"
           trendValue="+12% vs prior period"
         />
         <MetricCard
           title="Total Tokens"
-          value={(usage.data?.total_tokens ?? 0).toLocaleString()}
+          value={(stream.usage?.total_tokens ?? 0).toLocaleString()}
           subtitle={`last ${period}`}
         />
         <MetricCard
           title="Error Rate"
-          value={`${((usage.data?.error_rate ?? 0) * 100).toFixed(2)}%`}
-          trend={(usage.data?.error_rate ?? 0) < 0.01 ? "up" : "down"}
+          value={`${((stream.usage?.error_rate ?? 0) * 100).toFixed(2)}%`}
+          trend={(stream.usage?.error_rate ?? 0) < 0.01 ? "up" : "down"}
         />
         <MetricCard
           title="Monthly Cost"
@@ -88,11 +121,11 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       <div className="grid grid-2" style={{ marginBottom: "1.25rem" }}>
-        {latency.isLoading ? (
+        {!stream.latency ? (
           <LoadingCard rows={5} />
-        ) : latency.data ? (
-          <LatencyChart data={latency.data.models} />
-        ) : null}
+        ) : (
+          <LatencyChart data={stream.latency.models} />
+        )}
         {alerts.isLoading ? (
           <LoadingCard rows={4} />
         ) : (
