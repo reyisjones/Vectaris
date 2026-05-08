@@ -2,9 +2,13 @@
 
 A phased plan from the current MVP toward an enterprise-grade AI observability platform.
 
+> **Current version: v1.5-alpha** (May 2026)
+> All Phase 0–2 work is shipped. Phases 3–5 are partially complete.
+> See [PHASES.md](PHASES.md) for the detailed next-phase planning document.
+
 ---
 
-## Phase 0 — MVP (current release · v1.0)
+## Phase 0 — MVP (shipped · v1.0)
 
 - [x] FastAPI backend with usage / latency / agents / costs / alerts / LLM runtime
 - [x] React 18 SPA with Dashboard, Agents, Costs, Alerts, LLM pages
@@ -18,95 +22,108 @@ A phased plan from the current MVP toward an enterprise-grade AI observability p
 
 ---
 
-## Phase 1 — Real Data Sources (v1.1)
+## Phase 1 — Real Data Sources (shipped · v1.1)
 
 **Goal:** replace stub services with live integrations.
 
-- Azure Monitor + Application Insights query adapter
-- PromQL / Prometheus federation adapter
-- OpenAI / Anthropic / Azure OpenAI usage + billing import
-- Persistent storage layer (PostgreSQL via SQLAlchemy 2.x async)
-- Agent self-registration endpoint (`POST /api/v1/agents`)
-- API key authentication middleware
+- [x] Azure Monitor + Application Insights query adapter
+- [x] PromQL / Prometheus federation adapter
+- [x] OpenAI / Azure OpenAI usage + billing import
+- [x] AWS CUR cost adapter (SigV4 signed, no boto3)
+- [x] Agent self-registration endpoint (`POST /api/v1/agents`)
+- [x] API key authentication middleware (`X-API-Key`)
+- [x] OIDC / Azure Managed Identity (Azure AD, Okta, Auth0 via PyJWKClient)
+- [ ] Persistent storage layer (PostgreSQL via SQLAlchemy 2.x async) — _deferred to Phase 5_
 
 ---
 
-## Phase 2 — Multi-Provider LLM Support (v1.2)
+## Phase 2 — Multi-Provider LLM Support (shipped · v1.2)
 
 **Goal:** unify cost/latency telemetry across LLM providers.
 
-- Provider plugin interface (`Provider` protocol with `usage()`, `models()`, `cost()`)
-- Built-in plugins: OpenAI, Anthropic, Azure OpenAI, Bedrock, Ollama, vLLM
-- Token-usage analytics dashboard with model comparison
-- Provider-aware request proxy (capture latency at the proxy)
+- [x] LLM proxy endpoint (`POST /api/v1/llm/chat`) with token + latency capture
+- [x] OTel context propagation through LLM proxy (W3C traceparent)
+- [x] Distributed tracing demo (`examples/tracing-demo/`) — mock OpenAI + Ollama
+- [x] GraphQL gateway alongside REST (Strawberry at `/graphql`, GraphiQL IDE)
+- [ ] Full provider plugin interface (`Provider` protocol) — _deferred_
+- [ ] Token-usage analytics dashboard with model comparison — _deferred_
+- [ ] vLLM / Bedrock built-in plugins — _deferred_
 
 ---
 
-## Phase 3 — Alerting & Notifications (v1.3)
+## Phase 3 — Alerting & Notifications (shipped · v1.3)
 
-- YAML-defined alert rules with templating
-- Notification channels: Slack, Teams, PagerDuty, webhook, email (SMTP)
-- Alert deduplication + flapping suppression
-- Acknowledgement + on-call rotation hooks
-- SLO tracking with burn-rate alerts
-
----
-
-## Phase 4 — Cost Forecasting & FinOps (v1.4)
-
-- Time-series cost ingestion + persistence
-- ARIMA / Prophet forecasting model option (alongside linear)
-- Per-team budgets with anomaly detection
-- "What-if" simulator (model swap, quantization, rate change)
-- Showback / chargeback CSV export
+- [x] YAML-defined alert rules with CRUD API (`GET/PUT/DELETE /api/v1/alerts/rules/{id}`)
+- [x] Background scheduler (APScheduler) for periodic evaluation + webhook delivery
+- [x] Webhook signing (HMAC-SHA256) + retry
+- [x] Toast notifications in UI for new critical alerts
+- [ ] Notification channels: Slack, Teams, PagerDuty, email — _planned Phase 3.1_
+- [ ] Alert deduplication + flapping suppression — _planned Phase 3.1_
+- [ ] SLO tracking with burn-rate alerts — _planned Phase 3.2_
 
 ---
 
-## Phase 5 — Multi-Tenant & RBAC (v1.5)
+## Phase 4 — Cost Forecasting & FinOps (shipped · v1.4)
 
-- Tenant scoping at data + URL layer (`/t/{tenant}/api/v1/...`)
-- OIDC integration (Azure AD, Okta, Keycloak)
-- RBAC roles: Admin, Operator, Viewer, Billing
-- Per-tenant API keys with scoped permissions
-- Audit log of mutating actions
-
----
-
-## Phase 6 — Agent Orchestration & Reliability (v2.0)
-
-- LangGraph / CrewAI / AutoGen integration adapters
-- Agent run timeline with span tree visualization
-- Reliability scorecards (MTTR, success-rate trend, drift detector)
-- Replay-from-trace developer tool
+- [x] Linear cost forecast with horizon picker (7 / 30 / 60 / 90 days)
+- [x] Per-model and per-team cost breakdown
+- [x] Azure Cost Management + AWS CUR adapters
+- [ ] Time-series cost persistence — _planned Phase 5 (DB layer)_
+- [ ] ARIMA / Prophet forecast option — _planned Phase 4.1_
+- [ ] Per-team budgets with anomaly detection — _planned Phase 4.1_
+- [ ] "What-if" simulator — _planned Phase 4.2_
+- [ ] Showback / chargeback CSV export — _planned Phase 4.2_
 
 ---
 
-## Phase 7 — Edge Telemetry & Browser SDK (v2.1)
+## Phase 5 — Multi-Tenant & RBAC (in progress · v1.5)
 
-- `@vectaris/browser-sdk` to capture Web Vitals + LLM client calls
-- Frontend trace stitching with backend spans
-- Real-user monitoring panel
-
----
-
-## Phase 8 — Distributed Tracing UI (v2.2)
-
-- Built-in trace explorer (no Jaeger required)
-- Service map auto-derived from spans
-- Critical-path analysis for agent runs
+- [x] OIDC integration (Azure AD, Okta, Auth0)
+- [x] Per-tenant rate limiting and monthly token quotas (slowapi)
+- [ ] Persistent storage layer (PostgreSQL + SQLAlchemy 2.x async) — _next_
+- [ ] Tenant URL scoping (`/t/{tenant}/api/v1/...`) — _next_
+- [ ] RBAC roles: Admin, Operator, Viewer, Billing — _next_
+- [ ] Audit log of mutating actions — _next_
 
 ---
 
-## Phase 9 — Kubernetes / Infra Telemetry (v2.3)
+## Phase 6 — Agent Orchestration & Reliability (planned · v2.0)
 
-- ServiceMonitor + PrometheusRule CRDs shipped
-- Node / pod resource correlation with AI workloads
-- GPU utilization (DCGM exporter integration)
+- [ ] LangGraph / CrewAI / AutoGen integration adapters
+- [ ] Agent run timeline with span tree visualization
+- [ ] Reliability scorecards (MTTR, success-rate trend, drift detector)
+- [ ] Replay-from-trace developer tool
 
 ---
 
-## Phase 10 — Hosted Offering (v3.0)
+## Phase 7 — Edge Telemetry & Browser SDK (planned · v2.1)
 
-- Managed multi-tenant SaaS deployment
-- Organization billing portal
-- Marketplace of provider plugins + alert templates
+- [x] OTel Browser SDK + Web Vitals integration (`src/telemetry.ts`)
+- [x] PWA manifest + service worker offline cache
+- [ ] `@vectaris/browser-sdk` npm package (standalone, publishable)
+- [ ] Real-user monitoring panel
+
+---
+
+## Phase 8 — Distributed Tracing UI (planned · v2.2)
+
+- [ ] Built-in trace explorer (no Jaeger required)
+- [ ] Service map auto-derived from spans
+- [ ] Critical-path analysis for agent runs
+
+---
+
+## Phase 9 — Kubernetes / Infra Telemetry (planned · v2.3)
+
+- [x] ServiceMonitor + PrometheusRule CRDs shipped
+- [x] Grafana dashboard JSON provisioned
+- [ ] Node / pod resource correlation with AI workloads
+- [ ] GPU utilization (DCGM exporter integration)
+
+---
+
+## Phase 10 — Hosted Offering (planned · v3.0)
+
+- [ ] Managed multi-tenant SaaS deployment
+- [ ] Organization billing portal
+- [ ] Marketplace of provider plugins + alert templates

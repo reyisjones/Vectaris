@@ -19,10 +19,16 @@ Vectaris provides a unified observability layer for AI workloads. It aggregates 
 - **Latency metrics** — P50 / P95 / P99 per model and endpoint
 - **Cost attribution** — by model and by team, with linear forecast
 - **Agent health** — uptime, success rate, throughput, status badges
-- **Alerts** — rules evaluated live against current telemetry
+- **Alerts** — YAML-defined rules evaluated live; webhook delivery (HMAC-signed)
 - **LLM runtime monitoring** — Ollama liveness + installed model registry
+- **LLM proxy** — `/api/v1/llm/chat` with token/latency capture and OTel trace propagation
+- **GraphQL gateway** — Strawberry schema at `/graphql` with GraphiQL IDE alongside REST
+- **Live metrics stream** — SSE endpoint replaces polling; auto-reconnecting React hook
+- **Rate limiting** — per-user and global limits via slowapi; monthly per-tenant quotas
+- **Authentication** — hierarchical: OIDC (Azure AD / Okta / Auth0) › API key › open
 - **OpenTelemetry-native** — OTLP traces and metrics, Prometheus scrape endpoint
 - **Structured JSON logs** with trace correlation IDs
+- **PWA** — offline cached last-known telemetry, service worker, Web App Manifest
 
 ---
 
@@ -31,12 +37,18 @@ Vectaris provides a unified observability layer for AI workloads. It aggregates 
 | Layer            | Technology                                      |
 |------------------|-------------------------------------------------|
 | Frontend         | React 18 · Vite · TypeScript · React Router · Recharts · TanStack Query |
+| Frontend testing | Vitest · @testing-library/react · jsdom         |
 | Backend          | Python 3.12 · FastAPI · Pydantic v2 · structlog |
+| GraphQL          | Strawberry (schema-first, GraphiQL IDE)         |
+| Auth             | OIDC (PyJWKClient) · API key middleware         |
+| Rate limiting    | slowapi (Redis / in-memory)                     |
+| Background jobs  | APScheduler (alert evaluation + webhook fanout) |
 | Telemetry        | OpenTelemetry SDK · OTLP exporter · Prometheus  |
 | Containerization | Docker · Docker Compose                         |
+| Packaging        | Helm chart (`deploy/helm/vectaris/`)            |
 | Orchestration    | Kubernetes (AKS-ready)                          |
-| Cloud            | Azure Container Apps / AKS                      |
-| CI/CD            | GitHub Actions                                  |
+| Cloud            | Azure Container Apps / AKS · Bicep IaC          |
+| CI/CD            | GitHub Actions · Dependabot · pre-commit        |
 
 ---
 
@@ -93,12 +105,20 @@ npm run dev
 | GET | `/metrics` | Prometheus-format metrics |
 | GET | `/api/v1/metrics/usage`   | Token / request / error roll-ups |
 | GET | `/api/v1/metrics/latency` | P50 / P95 / P99 per model |
+| GET | `/api/v1/metrics/stream`  | SSE live metrics push (usage + latency) |
 | GET | `/api/v1/agents`             | Registered agents with status |
+| POST | `/api/v1/agents`            | Register a new agent |
 | GET | `/api/v1/agents/{id}/health` | Per-agent health snapshot |
+| PATCH | `/api/v1/agents/{id}/heartbeat` | Agent liveness heartbeat |
+| DELETE | `/api/v1/agents/{id}`     | Deregister an agent |
 | GET | `/api/v1/costs`              | Cost breakdown by model and team |
 | GET | `/api/v1/costs/forecast`     | Linear cost projection |
+| GET/PUT/DELETE | `/api/v1/alerts/rules/{id}` | Alert rule CRUD |
 | GET | `/api/v1/alerts`             | Active alerts (live evaluation) |
 | GET | `/api/v1/llm/runtime`        | Ollama runtime status & installed models |
+| POST | `/api/v1/llm/chat`          | LLM proxy with token/latency capture |
+| GET | `/api/v1/llm/quota`          | Per-tenant monthly quota status |
+| GET/POST | `/graphql`             | GraphQL API (GraphiQL IDE at GET) |
 
 Full Swagger docs: `http://localhost:8000/docs`.
 
@@ -118,6 +138,12 @@ All backend settings are environment-driven. See [backend/.env.example](backend/
 | `OLLAMA_ENABLED` | `false` | Enable local LLM runtime checks |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama daemon URL |
 | `AZURE_MONITOR_CONNECTION_STRING` | _(empty)_ | Optional Azure Monitor |
+| `API_KEY` | _(empty)_ | Enable API key auth (`X-API-Key` header) |
+| `OIDC_ENABLED` | `false` | Enable OIDC / JWT authentication |
+| `OIDC_ISSUER` | _(empty)_ | OIDC issuer URL (Azure AD / Okta / Auth0) |
+| `OIDC_AUDIENCE` | _(empty)_ | Expected JWT audience claim |
+| `RATE_LIMIT_ENABLED` | `true` | Toggle request rate limiting |
+| `REDIS_URL` | _(empty)_ | Redis for rate-limit state (in-memory fallback) |
 
 ---
 
@@ -154,10 +180,14 @@ Every HTTP request is tagged with an `X-Request-ID` header (auto-generated if no
 Vectaris/
 ├── frontend/                       # React 18 + Vite + TS + React Router
 │   ├── src/
-│   │   ├── components/             # MetricCard, LatencyChart, AlertsList…
-│   │   ├── pages/                  # Dashboard / Agents / Costs / Alerts / LLM
-│   │   ├── services/api.ts         # Typed Axios client
-│   │   └── styles/global.css       # Theme
+│   │   ├── components/             # MetricCard, LatencyChart, AlertsList, ThemeToggle…
+│   │   ├── hooks/                  # useMetricsStream (SSE auto-reconnect)
+│   │   ├── pages/                  # Dashboard / Agents / Costs / Alerts / LLM / Settings
+│   │   ├── services/api.ts         # Typed Axios + EventSource client
+│   │   ├── telemetry.ts            # OTel Browser SDK + Web Vitals
+│   │   ├── test/                   # Vitest: components + hooks (22 tests)
+│   │   └── styles/global.css       # CSS custom-property theme (light + dark)
+│   ├── public/manifest.json        # PWA web app manifest
 │   ├── nginx.conf                  # SPA routing
 │   ├── tsconfig*.json              # TypeScript configs
 │   └── Dockerfile
@@ -165,20 +195,40 @@ Vectaris/
 │   ├── app/
 │   │   ├── main.py                 # App factory + middleware + lifespan
 │   │   ├── config.py               # pydantic-settings
+│   │   ├── auth.py                 # API key middleware
+│   │   ├── oidc.py                 # OIDC / JWT validation (PyJWKClient)
+│   │   ├── scheduler.py            # APScheduler: alert eval + webhook fanout
+│   │   ├── graphql_schema.py       # Strawberry GraphQL schema
 │   │   ├── logging_config.py       # structlog JSON renderer
 │   │   ├── middleware.py           # Request-ID + Prometheus metrics
 │   │   ├── routers/                # metrics, agents, costs, alerts, llm, health
 │   │   ├── models/                 # Pydantic schemas
-│   │   ├── services/               # Business logic (incl. Ollama, alerts)
+│   │   ├── services/               # Business logic (incl. Ollama, alerts, adapters)
 │   │   └── telemetry/setup.py      # OTel tracer + meter providers
-│   ├── tests/                      # pytest API tests
+│   ├── tests/                      # pytest API tests (19 passing)
 │   └── Dockerfile
 ├── deploy/
-│   └── kubernetes/                 # Namespace, Deployment, Service, HPA
-├── .github/workflows/ci.yml
+│   ├── kubernetes/                 # Namespace, Deployment, Service, Ingress, HPA, ServiceMonitor
+│   ├── helm/vectaris/              # Helm chart (Chart.yaml, values.yaml, templates/)
+│   ├── azure/                      # Bicep IaC (ACR, Key Vault, Log Analytics, Container Apps)
+│   └── grafana/                    # Grafana dashboard JSON + provisioning YAML
+├── docs/
+│   ├── adr/                        # 6 Architecture Decision Records
+│   └── guides/                     # instrumenting-custom-agents.md
+├── examples/
+│   └── tracing-demo/               # W3C traceparent demo (mock OpenAI + demo agent)
+├── scripts/
+│   └── setup-hooks.sh              # pre-commit hook installer
+├── .github/
+│   ├── workflows/ci.yml            # GitHub Actions: lint, test, build, audit
+│   └── dependabot.yml              # Dependabot: pip + npm + actions
+├── .pre-commit-config.yaml         # ruff, mypy, prettier, markdownlint
 ├── docker-compose.yml
 ├── ARCHITECTURE.md
 ├── ROADMAP.md
+├── PHASES.md
+├── CONTRIBUTING.md
+├── SECURITY.md
 ├── TODO.md
 └── CLEANUP_REPORT.md
 ```
