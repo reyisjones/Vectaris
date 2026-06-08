@@ -31,7 +31,7 @@ jobs:
         run: pip install pip-audit && pip-audit
         continue-on-error: true
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: backend/coverage.xml
 
