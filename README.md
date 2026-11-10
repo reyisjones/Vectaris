@@ -32,6 +32,24 @@ Vectaris provides a unified observability layer for AI workloads. It aggregates 
 
 ---
 
+## Architecture Diagrams
+
+### System architecture
+
+The React SPA reaches the FastAPI backend over REST, SSE and GraphQL. Each request goes through authentication and rate limiting, then routers hand off to the service layer. That layer queries telemetry sources such as Prometheus and the cloud cost APIs. A background scheduler evaluates alert rules and sends triggered alerts to an HMAC-signed webhook. Traces go to an OTLP collector.
+
+![Vectaris system architecture](docs/diagrams/architecture.png)
+
+### LLM chat proxy request
+
+A `POST /api/v1/llm/chat` call passes the auth and rate-limit checks: 20 requests per minute plus a monthly tenant quota. The router then forwards it to the resolved OpenAI-compatible upstream with a W3C `traceparent` header. The response returns with token counts and latency, and an `llm.chat.proxy` span is exported.
+
+![LLM chat proxy request sequence](docs/diagrams/llm-chat-sequence.png)
+
+Diagram sources live in [docs/diagrams/](docs/diagrams/) as JSON specifications.
+
+---
+
 ## Tech Stack
 
 | Layer            | Technology                                      |
@@ -214,6 +232,7 @@ Vectaris/
 │   └── grafana/                    # Grafana dashboard JSON + provisioning YAML
 ├── docs/
 │   ├── adr/                        # 6 Architecture Decision Records
+│   ├── diagrams/                   # Architecture + sequence diagrams (PNG + JSON source)
 │   └── guides/                     # instrumenting-custom-agents.md
 ├── examples/
 │   └── tracing-demo/               # W3C traceparent demo (mock OpenAI + demo agent)
@@ -228,9 +247,7 @@ Vectaris/
 ├── ROADMAP.md
 ├── PHASES.md
 ├── CONTRIBUTING.md
-├── SECURITY.md
-├── TODO.md
-└── CLEANUP_REPORT.md
+└── SECURITY.md
 ```
 
 ---

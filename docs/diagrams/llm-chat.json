@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "LLM Chat Proxy Request",
+    "output": "llm-chat.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "participants": [
+    { "id": "client", "type": "frontend", "label": "Client", "sublabel": "SPA / agent" },
+    { "id": "mw", "type": "security", "label": "Middleware", "sublabel": "request-id · auth" },
+    { "id": "rl", "type": "security", "label": "Rate limiter", "sublabel": "slowapi + quota" },
+    { "id": "router", "type": "backend", "label": "LLM router", "sublabel": "/api/v1/llm/chat" },
+    { "id": "upstream", "type": "external", "label": "LLM upstream", "sublabel": "Ollama / OpenAI" },
+    { "id": "otel", "type": "messagebus", "label": "OTel", "sublabel": "span exporter" }
+  ],
+  "segments": [
+    { "from": 150, "to": 250, "label": "Admission" },
+    { "from": 260, "to": 360, "label": "Proxy" },
+    { "from": 370, "to": 450, "label": "Response" }
+  ],
+  "messages": [
+    { "id": "post-chat", "from": "client", "to": "mw", "y": 165, "label": "POST /llm/chat", "variant": "emphasis" },
+    { "id": "check-limit", "from": "mw", "to": "rl", "y": 195, "label": "verify key / JWT", "variant": "security" },
+    { "id": "admit", "from": "rl", "to": "router", "y": 225, "label": "20/min + monthly quota ok", "variant": "security" },
+    { "id": "forward", "from": "router", "to": "upstream", "y": 280, "label": "/v1/chat/completions", "variant": "emphasis", "note": "traceparent injected" },
+    { "id": "reply", "from": "upstream", "to": "router", "y": 335, "label": "completion + usage", "variant": "return" },
+    { "id": "span", "from": "router", "to": "otel", "y": 385, "label": "llm.chat.proxy span", "variant": "dashed" },
+    { "id": "respond", "from": "router", "to": "client", "y": 420, "label": "ChatResponse · tokens · latency", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "mw", "from": 160, "to": 200, "type": "security" },
+    { "participant": "rl", "from": 190, "to": 230, "type": "security" },
+    { "participant": "router", "from": 220, "to": 425, "type": "backend" },
+    { "participant": "upstream", "from": 275, "to": 340, "type": "external" }
+  ],
+  "cards": [
+    { "dot": "rose", "title": "Admission", "items": ["Auth: OIDC › API key › open", "429 when per-minute or monthly limits are hit"] },
+    { "dot": "emerald", "title": "Upstream resolution", "items": ["LLM_CHAT_URL override", "Ollama when OLLAMA_ENABLED", "OpenAI-compatible default"] },
+    { "dot": "orange", "title": "Telemetry", "items": ["Span carries model + upstream attributes", "Token counts and latency returned to caller"] }
+  ]
+}

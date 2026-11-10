@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Vectaris System Architecture",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "Platform engineer", "sublabel": "Browser / PWA", "pos": [40, 200], "size": [140, 64] },
+    { "id": "spa", "type": "frontend", "label": "React SPA", "sublabel": "Vite · TanStack Query", "pos": [280, 200], "size": [140, 64] },
+    { "id": "auth", "type": "security", "label": "Auth + Rate limit", "sublabel": "OIDC › API key · slowapi", "pos": [520, 200], "size": [150, 64] },
+    { "id": "api", "type": "backend", "label": "FastAPI routers", "sublabel": "REST · SSE · GraphQL", "pos": [770, 200], "size": [140, 64] },
+    { "id": "services", "type": "backend", "label": "Service layer", "sublabel": "metrics · agents · costs", "pos": [1010, 200], "size": [150, 64], "tag": "alerts · llm" },
+    { "id": "llm", "type": "external", "label": "LLM upstream", "sublabel": "Ollama / OpenAI-compatible", "pos": [770, 40], "size": [150, 64] },
+    { "id": "sources", "type": "cloud", "label": "Telemetry sources", "sublabel": "Prometheus · AWS · Azure", "pos": [1010, 40], "size": [150, 64], "tag": "OpenAI billing" },
+    { "id": "otel", "type": "messagebus", "label": "OTLP collector", "sublabel": "Tempo · Jaeger · Azure Monitor", "pos": [760, 540], "size": [160, 64] },
+    { "id": "scheduler", "type": "backend", "label": "APScheduler", "sublabel": "alert evaluation loop", "pos": [1010, 380], "size": [150, 64] },
+    { "id": "webhook", "type": "external", "label": "Alert webhook", "sublabel": "HMAC-signed POST", "pos": [1010, 540], "size": [150, 64] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "Vectaris backend", "wraps": ["auth", "api", "services", "scheduler"] }
+  ],
+  "connections": [
+    { "id": "user-spa", "from": "user", "to": "spa", "label": "HTTPS", "variant": "emphasis" },
+    { "id": "spa-auth", "from": "spa", "to": "auth", "label": "REST · SSE", "variant": "emphasis" },
+    { "id": "auth-api", "from": "auth", "to": "api", "label": "verified", "variant": "security" },
+    { "id": "api-services", "from": "api", "to": "services", "label": "delegate" },
+    { "id": "api-llm", "from": "api", "to": "llm", "label": "proxy chat", "variant": "dashed" },
+    { "id": "services-sources", "from": "services", "to": "sources", "label": "query" },
+    { "id": "api-otel", "from": "api", "to": "otel", "label": "OTLP traces", "variant": "dashed" },
+    { "id": "scheduler-services", "from": "scheduler", "to": "services", "label": "evaluate" },
+    { "id": "scheduler-webhook", "from": "scheduler", "to": "webhook", "label": "triggered alerts", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Frontend", "items": ["Pages: Dashboard, Agents, Costs, Alerts, LLM", "Live metrics over SSE with auto-reconnect", "OTel browser SDK + Web Vitals"] },
+    { "dot": "rose", "title": "Security", "items": ["Hierarchical auth: OIDC › API key › open", "Per-user + global rate limits, monthly tenant quota"] },
+    { "dot": "emerald", "title": "Observability", "items": ["Prometheus /metrics endpoint", "structlog JSON logs with trace_id", "X-Request-ID on every response"] }
+  ]
+}
